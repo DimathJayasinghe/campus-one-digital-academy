@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CampusOne.App/CampusOne.App.csproj" />
+    <Project Path="src/CampusOne.Core/CampusOne.Core.csproj" />
+    <Project Path="src/CampusOne.Data/CampusOne.Data.csproj" />
+  </Folder>
+</Solution>

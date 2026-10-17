@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Allows restore/build on Linux dev machines -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>CampusOne.App</RootNamespace>
+    <AssemblyName>CampusOne</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CampusOne.Core\CampusOne.Core.csproj" />
+    <ProjectReference Include="..\CampusOne.Data\CampusOne.Data.csproj" />
+  </ItemGroup>
+
+</Project>

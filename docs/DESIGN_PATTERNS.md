@@ -9,31 +9,27 @@
 
 | # | Pattern | Category | File(s) |
 |---|---|---|---|
-| 1 | Repository | Structural | `IStudentRepository`, `StudentRepository` |
+| 1 | Repository | Structural | `IStudentRepository`, `StudentRepository`, `ILoginRepository`, `LoginRepository` |
 | 2 | Factory Method | Creational | `DbConnectionFactory` |
 | 3 | Composition Root | Architectural | `Program.cs` |
-| 4 | Dependency Inversion (DIP) | SOLID | All interfaces in `Core` |
-| 5 | Observer / Event | Behavioural | `RegistrationForm.LogoutRequested` |
+| 4 | Dependency Inversion (DIP) | SOLID | `IStudentRepository`, `ILoginRepository` in `CampusOne.Core` |
+| 5 | Observer / Event | Behavioural | `RegistrationForm.LogoutRequested`, `StudentRecordsForm.StudentSelected` |
 
 ---
 
 ## 1. Repository Pattern
 
 ### What it is
-Wraps all database access inside a class that looks like an in-memory collection. The caller doesn't know (or care) whether data comes from SQL Server, an API, or a file.
+Wraps all database access inside a dedicated class that abstracts queries away from UI presentation logic. The caller consumes standard C# methods without writing or knowing the underlying SQL syntax.
 
 ### Why we used it
-The WinForms forms should **not** contain SQL strings. If a table column is renamed, we change one repository file — not every button click handler.
+WinForms UI controls should never directly execute raw SQL queries. If database tables or column types change, changes are isolated strictly to the repository implementation rather than scattered across dozens of button click handlers.
 
 ### Where it is
-
-```
-Core/Interfaces/IStudentRepository.cs   ← contract
-Data/Repositories/StudentRepository.cs ← SQL implementation
-```
+- Contract: `src/CampusOne.Core/Interfaces/IStudentRepository.cs` and `ILoginRepository.cs`
+- Implementation: `src/CampusOne.Data/Repositories/StudentRepository.cs` and `LoginRepository.cs`
 
 ### Code sketch
-
 ```csharp
 // Core/Interfaces/IStudentRepository.cs
 public interface IStudentRepository
@@ -57,7 +53,6 @@ public class StudentRepository : IStudentRepository
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? MapRow(reader) : null;
     }
-    // ... other methods
 }
 ```
 
@@ -66,23 +61,15 @@ public class StudentRepository : IStudentRepository
 ## 2. Factory Method Pattern
 
 ### What it is
-A dedicated class whose only job is to **create** objects — in this case, open SQL connections.
+A specialized factory class responsible for instantiating and opening database connections with the configured connection string.
 
 ### Why we used it
-Without a factory:
-- Every repository would repeat the same connection string
-- Changing the string means editing 5 different files
-
-With `DbConnectionFactory`, the string lives in exactly one place.
+Centralizes connection string management, prevents code duplication across multiple repositories, and ensures connection state is consistently initialized and safely wrapped in `using` statements for automatic resource disposal.
 
 ### Where it is
-
-```
-Data/DbConnectionFactory.cs
-```
+`src/CampusOne.Data/DbConnectionFactory.cs`
 
 ### Code sketch
-
 ```csharp
 public class DbConnectionFactory
 {
@@ -91,7 +78,6 @@ public class DbConnectionFactory
     public DbConnectionFactory(string connectionString) =>
         _connectionString = connectionString;
 
-    // Call this to get a ready-to-use, open connection
     public SqlConnection Create()
     {
         var conn = new SqlConnection(_connectionString);
@@ -101,37 +87,30 @@ public class DbConnectionFactory
 }
 ```
 
-Every repository calls `_factory.Create()` and disposes the connection with `using`.
-
 ---
 
-## 3. Composition Root
+## 3. Composition Root Pattern
 
 ### What it is
-A single location in the application where **all dependencies are created and wired together**. This is always the entry point (`Program.cs`).
+A single, unified application location where all concrete dependencies are instantiated and wired together before the primary UI forms run.
 
 ### Why we used it
-Avoids "new everywhere" — no form creates its own repository. This makes testing easier because you can substitute a fake repository from outside.
+Eliminates scattered `new` expressions and hidden dependencies inside UI classes. Forms receive their dependencies via constructors, simplifying code understanding and maintenance.
 
 ### Where it is
-
-```
-App/Program.cs
-```
+`src/CampusOne.App/Program.cs`
 
 ### Code sketch
-
 ```csharp
 [STAThread]
-static void Main()
+private static void Main()
 {
     ApplicationConfiguration.Initialize();
 
-    // All dependencies created in one place
+    // Wire up dependencies in one location
     var factory   = new DbConnectionFactory(AppConfig.ConnectionString);
     var loginRepo = new LoginRepository(factory);
 
-    // Hand dependencies into the form — not constructed inside the form
     Application.Run(new LoginForm(loginRepo));
 }
 ```
@@ -143,104 +122,38 @@ static void Main()
 ### What it is
 > *"High-level modules should not depend on low-level modules. Both should depend on abstractions."*
 
-In practice: forms depend on **interfaces** (from Core), not on **concrete classes** (from Data).
+Forms in `CampusOne.App` depend exclusively on interfaces defined in `CampusOne.Core`, not on concrete SQL implementations in `CampusOne.Data`.
 
 ### Why we used it
-
-```mermaid
-flowchart LR
-    BAD["❌ RegistrationForm\ndepends on\nStudentRepository"]
-    GOOD["✅ RegistrationForm\ndepends on\nIStudentRepository"]
-    BAD --> |"tightly coupled"| X1[" "]
-    GOOD --> |"loose coupling"| X2[" "]
-```
-
-If we later switch from SQL Server to PostgreSQL, we write a new `PostgresStudentRepository : IStudentRepository` and change **one line in Program.cs** — nothing in the form.
-
-### Where it is
-
-```
-Core/Interfaces/   ← all interfaces (abstractions)
-Data/Repositories/ ← concrete classes that implement them
-App/Forms/         ← constructors accept interfaces
-```
-
-### Code sketch
-
-```csharp
-// Form constructor accepts the INTERFACE, not the class
-public class RegistrationForm : Form
-{
-    private readonly IStudentRepository _studentRepo;
-
-    public RegistrationForm(IStudentRepository studentRepo)
-    {
-        _studentRepo = studentRepo;
-    }
-}
-```
+Allows changing the database engine or substituting mock repositories without altering a single line of UI presentation code.
 
 ---
 
 ## 5. Observer Pattern (C# Events)
 
 ### What it is
-Allows one object to notify other objects when something happens, **without** the notifier knowing who is listening.
+Allows one object to broadcast state changes or user actions to listeners without tight coupling or circular dependencies.
 
 ### Why we used it
-`RegistrationForm` needs to tell `LoginForm` "the user logged out" — but it shouldn't hold a reference to `LoginForm`. Using an event keeps the two forms decoupled.
-
-### Where it is
-
-```
-App/Forms/RegistrationForm.cs   → declares the event
-App/Forms/LoginForm.cs          → subscribes to the event
-```
+- `RegistrationForm.LogoutRequested`: Signals `LoginForm` to re-appear when the user clicks Logout, preventing circular references between forms.
+- `StudentRecordsForm.StudentSelected`: Notifies `RegistrationForm` when a row is selected/double-clicked, passing the selected `regNo` to automatically populate the registration form.
 
 ### Code sketch
-
 ```csharp
-// RegistrationForm — publishes
-public class RegistrationForm : Form
-{
-    public event Action? LogoutRequested;
+// StudentRecordsForm broadcasts:
+public event Action<int>? StudentSelected;
 
-    // called when user clicks Logout link
-    llLogout.LinkClicked += (_, _) => LogoutRequested?.Invoke();
+private void BtnOpen_Click(object? sender, EventArgs e)
+{
+    if (int.TryParse(dgvStudents.SelectedRows[0].Cells["RegNo"].Value?.ToString(), out var regNo))
+    {
+        StudentSelected?.Invoke(regNo);
+        Close();
+    }
 }
 
-// LoginForm — subscribes
-var regForm = new RegistrationForm(studRepo);
-regForm.LogoutRequested += () =>
-{
-    regForm.Hide();
-    Show();           // show login form again
-    txtUsername.Clear();
-    txtPassword.Clear();
-    txtUsername.Focus();
-};
-```
-
----
-
-## Pattern Interaction Diagram
-
-```mermaid
-flowchart TD
-    CR["Composition Root\nProgram.cs"]
-    FM["Factory Method\nDbConnectionFactory"]
-    DIP["DIP\nIStudentRepository\nILoginRepository"]
-    REP["Repository\nStudentRepository\nLoginRepository"]
-    OBS["Observer\nLogoutRequested event"]
-    LF["LoginForm"]
-    RF["RegistrationForm"]
-
-    CR -->|"creates"| FM
-    CR -->|"creates"| REP
-    CR -->|"injects into"| LF
-    LF -->|"creates + subscribes"| OBS
-    OBS -->|"on"| RF
-    REP -->|"implements"| DIP
-    LF -->|"depends on"| DIP
-    RF -->|"depends on"| DIP
+// RegistrationForm listens:
+var recordsForm = new StudentRecordsForm(_studentRepo);
+recordsForm.StudentSelected += regNo => LoadStudentByRegNo(regNo);
+recordsForm.ShowDialog(this);
 ```

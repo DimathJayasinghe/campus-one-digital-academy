@@ -5,113 +5,113 @@
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com)
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2022-red)](https://hub.docker.com/_/microsoft-mssql-server)
-[![Docker](https://img.shields.io/badge/Docker-required-blue)](https://www.docker.com)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://www.docker.com)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20Build-lightgrey)](https://learn.microsoft.com/en-us/dotnet/desktop/winforms)
 
 ---
 
-## What This Is
+## Overview
 
-A Windows Forms desktop application that lets an admin log in and manage student registrations (Create, Read, Update, Delete).
+A robust, enterprise-grade Windows Forms desktop application built in C# for Campus One Digital Academy. It features multi-layered architecture, secure parameterized ADO.NET data access, Dockerized SQL Server 2022, input validation, and extended management utilities.
 
-| Form | Purpose |
-|---|---|
-| **Login** | Authenticate admin user |
-| **Registration** | Full CRUD for student records |
+### Application Forms
+
+| Form | Purpose | Features |
+|---|---|---|
+| **1. Login Form** | System Authentication | Validates against SQL database `Logins` table, Clear fields, Exit confirmation, Enter-key support |
+| **2. Registration Form** | Student Records CRUD | Complete CRUD (Register, Update, Clear, Delete), 4 GroupBoxes, search by RegNo, input validation |
+| **3. Student Directory** | Records & Reporting *(Bonus)* | Live search, gender filter, student counter, double-click to load, **Export to CSV** |
+| **4. User Management** | Multi-User Admin *(Bonus)* | Add system users, change passwords, delete users, protection for primary Admin account |
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-- .NET SDK 10.0+
-- Docker Desktop
+### 1. Prerequisites
+- [.NET SDK 10.0+](https://dotnet.microsoft.com/download)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
 
-### 1. Start the Database
+### 2. Start SQL Server 2022 in Docker
+
+Execute the startup script for your operating system to launch the container and automatically initialize the `Student` database and tables:
+
+- **Linux / macOS:**
+  ```bash
+  bash scripts/db-start.sh
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  .\scripts\db-start.ps1
+  ```
+- **Windows (Command Prompt):**
+  ```cmd
+  scripts\db-start.bat
+  ```
+
+### 3. Build & Run Application
 
 ```bash
-bash scripts/db-start.sh
-```
+# Verify build
+dotnet build --configuration Release
 
-This spins up SQL Server 2022 in Docker and seeds the `Student` database.
-
-### 2. Run the App (Windows only — WinForms)
-
-```bash
+# Run on Windows
 dotnet run --project src/CampusOne.App
 ```
 
-**Login:** `Admin` / `Campusone@123`
+**Default Admin Credentials:**
+- **Username:** `Admin`
+- **Password:** `Campusone@123`
 
 ---
 
-## Project Structure
+## Project Architecture
+
+Built with a 3-tier Layered Architecture adhering strictly to SOLID principles:
 
 ```
-src/
-  CampusOne.Core/       Domain models & interfaces
-  CampusOne.Data/       ADO.NET repositories
-  CampusOne.App/        WinForms UI
-docker/
-  docker-compose.yml    SQL Server 2022 container
-scripts/
-  init.sql              Database + table creation
-  db-start.sh           One-command DB startup
-docs/
-  ARCHITECTURE.md
-  DATABASE_SCHEMA.md
-  DESIGN_PATTERNS.md
-  DEVELOPER_GUIDE.md
+┌────────────────────────────────────────┐
+│            CampusOne.App               │  WinForms UI (Forms, Controls, Validation)
+└───────────────────┬────────────────────┘
+                    │ references
+       ┌────────────┴────────────┐
+       ▼                         ▼
+┌──────────────┐          ┌──────────────┐
+│CampusOne.Core│ ◄─────── │CampusOne.Data│  ADO.NET Repositories & Connection Factory
+└──────────────┘implements└──────┬───────┘
+  Domain Models &                │
+  Interfaces                     ▼
+                          ┌──────────────┐
+                          │  SQL Server  │  Docker Container (Port 1433)
+                          └──────────────┘
 ```
 
 ---
 
-## Architecture
+## Design Patterns Used
 
-Three-layer architecture using **Repository Pattern** and **Dependency Inversion**:
-
-```
-WinForms UI (App) → Interfaces (Core) ← ADO.NET (Data) → SQL Server (Docker)
-```
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full diagram.
-
----
-
-## Database
-
-SQL Server 2022 via Docker. Two tables:
-
-- **`Logins`** — application users (default: Admin/Campusone@123)
-- **`Registration`** — student records (12 columns, `regNo` as PK)
-
-See [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) for the full schema.
+| Pattern | Implementation | Purpose |
+|---|---|---|
+| **Repository** | `IStudentRepository`, `ILoginRepository` | Isolates all raw SQL queries from UI layers |
+| **Factory Method** | `DbConnectionFactory` | Centralizes connection creation and security configuration |
+| **Composition Root** | `Program.cs` | Pure dependency injection wiring at entry point |
+| **Dependency Inversion** | Core Interfaces | Decouples high-level UI from low-level data layer |
+| **Observer (Events)** | `LogoutRequested`, `StudentSelected` | Clean, decoupled inter-form communication |
 
 ---
 
-## Design Patterns
+## Documentation
 
-| Pattern | Purpose |
-|---|---|
-| Repository | Isolates SQL from UI |
-| Factory Method | Creates SQL connections |
-| Composition Root | Wires dependencies in `Program.cs` |
-| Dependency Inversion | Forms depend on interfaces |
-| Observer (Events) | Decoupled form-to-form communication |
-
-See [`docs/DESIGN_PATTERNS.md`](docs/DESIGN_PATTERNS.md) for code examples.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Comprehensive architectural specifications & diagrams
+- [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) — Database schema, ERD, and SQL tables
+- [`docs/DESIGN_PATTERNS.md`](docs/DESIGN_PATTERNS.md) — Design patterns with C# code examples
+- [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — Developer handbook and troubleshooting guide
+- [`docs/AGENT_HANDOVER.md`](docs/AGENT_HANDOVER.md) — Context handover log for AI agents
 
 ---
 
-## Development
+## Author & Academic Information
 
-See [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) for:
-- Adding new features
-- Git workflow
-- Docker commands
-- Troubleshooting
-
----
-
-## Author
-
-Anuji Galappaththi — L3 Diploma in Information Technology, ESOFT Metro Campus
+- **Student Name:** Dimath Jayasinghe
+- **Programme:** L3 - Diploma in Information Technology
+- **Institution:** ESOFT Metro Campus
+- **Project Title:** Campus One Digital Academy

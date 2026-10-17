@@ -95,8 +95,8 @@ public class LoginForm : Form
         if (user is null)
         {
             MessageBox.Show(
-                "Invalid username or password. Please try again.",
-                "Login Failed",
+                "Invalid Login credentials, please check Username and Password and try again",
+                "Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             txtPassword.Clear();
